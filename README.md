@@ -18,7 +18,7 @@ Attempts made:
 1. Logistic regression with arbitrarily chosen predictors
 2. KNN with K=5 on columns 11:30
 
-Date of most recent submission: 
+Date of most recent submission: 11/24/19
 
 
 ## Karan 
