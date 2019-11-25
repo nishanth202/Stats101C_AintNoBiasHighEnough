@@ -1,0 +1,123 @@
+---
+title: "101C BBall model"
+author: "William Zhu"
+date: '2019-11-24'
+output: html_document
+---
+
+Loading data and required packages
+
+```{r setup, include=FALSE}
+getwd()
+setwd("/Users/frankzhu/dev/101C modelling/fall-2019-stats-101c")
+train = read.csv('train.csv')
+test = read.csv('test.csv')
+
+library(ggplot2)
+library(dplyr)
+library(randomForest)
+```
+
+
+Combining the test and training dataset and removing ID vectors as they don't provide statistical insights.
+
+```{r}
+dim(train)
+dim(test)
+
+test_labels = test$id
+game_labels = test$gameID
+test$HTWins <- NA
+dim(test)
+all <- rbind(train, test)
+all$id <- NULL
+all$gameID <- NULL
+
+summary(all)
+dim(all)
+str(all)
+
+plot(all$HTWins)
+```
+
+Splitting Variables into groups.
+
+```{r}
+#HT and VT variables
+VT_vars = names(all[,grepl("VT", names(all))])
+HT_vars = names(all[,grepl("HT", names(all))])
+
+#HT and VT team variables
+VT_team_vars_TS = names(all[,grepl("VT.TS", names(all))])
+VT_team_vars_TA = names(all[,grepl("VT.TA", names(all))])
+VT_team_vars_OTS = names(all[,grepl("VT.OTS", names(all))])
+VT_team_Vars_OTA = names(all[,grepl("VT.OTA", names(all))])
+
+HT_team_vars_TS = names(all[,grepl("HT.TS", names(all))])
+HT_team_vars_TA = names(all[,grepl("HT.TA", names(all))])
+HT_team_vars_OTS = names(all[,grepl("HT.OTS", names(all))])
+HT_team_Vars_OTA = names(all[,grepl("HT.OTA", names(all))])
+
+#HT and VT player variables
+VT_team_vars_S1 = names(all[,grepl("VT.S1", names(all))])
+VT_team_vars_S2 = names(all[,grepl("VT.S2", names(all))])
+VT_team_vars_S3 = names(all[,grepl("VT.S3", names(all))])
+VT_team_Vars_S4 = names(all[,grepl("VT.S4", names(all))])
+VT_team_Vars_S5 = names(all[,grepl("VT.S5", names(all))])
+
+VT_team_vars_OS1 = names(all[,grepl("VT.OS1", names(all))])
+VT_team_vars_OS2 = names(all[,grepl("VT.OS2", names(all))])
+VT_team_vars_OS3 = names(all[,grepl("VT.OS3", names(all))])
+VT_team_Vars_OS4 = names(all[,grepl("VT.OS4", names(all))])
+VT_team_Vars_OS5 = names(all[,grepl("VT.OS5", names(all))])
+
+HT_team_vars_S1 = names(all[,grepl("HT.S1", names(all))])
+HT_team_vars_S2 = names(all[,grepl("HT.S2", names(all))])
+HT_team_vars_S3 = names(all[,grepl("HT.S3", names(all))])
+HT_team_Vars_S4 = names(all[,grepl("HT.S4", names(all))])
+HT_team_Vars_S5 = names(all[,grepl("HT.S5", names(all))])
+
+HT_team_vars_OS1 = names(all[,grepl("HT.OS1", names(all))])
+HT_team_vars_OS2 = names(all[,grepl("HT.OS2", names(all))])
+HT_team_vars_OS3 = names(all[,grepl("HT.OS3", names(all))])
+HT_team_Vars_OS4 = names(all[,grepl("HT.OS4", names(all))])
+HT_team_Vars_OS5 = names(all[,grepl("HT.OS5", names(all))])
+
+#PMX Variables
+VT_pmx = names(all[,grepl("VT.pmx", names(all))])
+
+HT_pmx = names(all[,grepl("HT.pmx", names(all))])
+
+scale(all[,HT_team_vars_S1], center = T)
+```
+
+
+Feature Engineering
+
+The first thing i'm going to do is create a player efficiency variable. I'm basing this metric as a simplified version of NBA player efficiency formulas by doing a sum of pts,ast,and stl per minute.
+
+I'm going to try it on the HT.S1 variables first
+```{r}
+
+all[, HT_team_vars_S1]
+```
+
+```{r}
+set.seed(2019) 
+summary(all)
+dim(all)
+which(is.na(all), arr.ind=TRUE)
+quick_RF <- randomForest(x=all[1:9520,], y=all$HTWins[1:9520], ntree=100,importance=TRUE)
+imp_RF <- importance(quick_RF)
+imp_DF <- data.frame(Variables = row.names(imp_RF), MSE = imp_RF[,1])
+imp_DF <- imp_DF[order(imp_DF$MSE, decreasing = TRUE),]
+
+ggplot(imp_DF[1:20,], aes(x=reorder(Variables, MSE), y=MSE, fill=MSE)) + geom_bar(stat = 'identity') + labs(x = 'Variables', y= '% increase MSE if variable is randomly permuted') + coord_flip() + theme(legend.position="none")
+
+all[1:5,  c('VT','HT')]
+
+
+```
+
+
+
