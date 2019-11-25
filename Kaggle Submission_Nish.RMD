@@ -1,4 +1,9 @@
-############################## READING THE FILE ##############################
+---
+title: "Stats 101C_Final Project"
+author: "Nishanth Shetty"
+date: "November 21, 2019"
+output: html_document
+---
 
 ```{r}
 library(readr)
@@ -11,11 +16,50 @@ attach(Basketball_train)
 dim(Basketball_train)
 dim(Basketball_test)
 
+## Checking for NA's
+sapply(Basketball_train, function(x) sum(is.na(x)))
+
+## Are there repeat Game ID's
+sum(duplicated(Basketball_train$gameID))
+
 ```
 
-############################## LOGISTIC REGRESSION ##############################
+```{r}
+
+Basketball_train <- Basketball_train %>%  mutate(VT.TS.fg.percentage = VT.TS.fgm/VT.TS.fga, HT.TS.fg.percentage = HT.TS.fgm/HT.TS.fga)
+
+Basketball_train <- Basketball_train %>%  mutate(VT.TS.tp.percentage = VT.TS.tpm/VT.TS.tpa ,HT.TS.tp.percentage = HT.TS.tpm/HT.TS.tpa) 
+
+# How many duplicated Game ID's
+sum(duplicated(Basketball_train$gameID))
+
+Basketball_test <- Basketball_test %>%  mutate(VT.TS.fg.percentage = VT.TS.fgm/VT.TS.fga, HT.TS.fg.percentage = HT.TS.fgm/HT.TS.fga)
+
+Basketball_test <- Basketball_test %>%  mutate(VT.TS.tp.percentage = VT.TS.tpm/VT.TS.tpa ,HT.TS.tp.percentage = HT.TS.tpm/HT.TS.tpa) 
+
+```
+
+ccc:
+
+fg.percentage % Field Goals Made **
+tp.percentage % 3 Points Made ** 
+fta Free Throws Attempted **
+ftm Free Throws Made **
+oreb Offensive Rebounds
+dreb Defensive Rebounds
+treb Team Rebounds ** 
+ast Assists **
+stl Steals **
+blk Blocked Shots **
+to Turn Overs 
+pf Personal Fouls ** 
+pts Total Points **
+
+
+############################## 11.22 LOGISTIC REGRESSION ##############################
 
 ```{r}
+
 summary(Basketball_train)
 
 names(Basketball_train)
@@ -37,7 +81,7 @@ write.csv(test_prediction_df_logistic,'C:/Users/Nishanth Shetty/Desktop/Recovere
 ```
 
 
-############################## KNN ##############################
+############################## 11.22 KNN ##############################
 ```{r}
 
 library(class)
@@ -58,4 +102,154 @@ colnames(test_prediction_df_knn) <- c("id","HTWins")
 write.csv(test_prediction_df_knn,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-23_knn.csv') 
 ```
 
+
+Most significant predictors from Literature: 
+
+VT.TS.fg.percentage
+HT.TS.fg.percentage
+VT.TS.tp.percentage
+HT.TS.tp.percentage
+VT.TS.pts
+HT.TS.pts
+VT.TS.pf
+HT.TS.pf
+VT.TS.ast
+HT.TS.ast
+VT.TS.dreb
+HT.TS.dreb
+VT.TS.fta
+HT.TS.fta
+VT.TS.stl
+HT.TS.stl
+
+## Regsubsets to find the best subset
+```{r}
+library(leaps)
+
+names(Basketball_train)
+
+nr <- regsubsets(VT.TA.to ~ HTcumRest + VT.TS.fgm+VT.TS.fga+VT.TS.tpm+VT.TS.tpa, data = Basketball_train, method = "exhaustive")
+
+nish_rgs <- regsubsets(as.factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl, data = Basketball_train, method = "exhaustive")
+
+dim(Basketball_test)
+nish_rgs_summary <- summary(nish_rgs)
+plot(1:8,nish_rgs_summary$bic,type = "b")
+
+which.min(nish_rgs_summary$bic)
+
+
+library(corrplot)
+corrplot(cor(Weekly[,-9]), method = "number")
+
+corrplot(cor(Basketball_train[,c("VT.TS.tp.percentage","VT.TS.fg.percentage","HT.TS.fg.percentage","VT.TS.tp.percentage","HT.TS.tp.percentage","VT.TS.pts","HT.TS.pts","VT.TS.pf","HT.TS.pf","VT.TS.ast","HT.TS.ast","VT.TS.dreb","HT.TS.dreb","VT.TS.fta","HT.TS.fta"
+,"VT.TS.stl","HT.TS.stl")]), method = "number")
+
+```
+* The best subset is the full model 
+
+############################## 11.24 LOGISTIC REGRESSION ##############################
+
+```{r}
+logistic_basketball_11.24 <- glm(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl, data= Basketball_train, family = "binomial")
+
+probability_predictions_training <- predict(logistic_basketball_11.24,newdata = Basketball_train,type = "response") # Predicting on training data 
+predictions_training <-  ifelse(probability_predictions_training > 0.5, "Yes", "No")
+mean(predictions_training != Basketball_train$HTWins) ## Training Error Rate
+
+probability_predictions_test <- predict(logistic_basketball_11.24,newdata = Basketball_test,type = "response") #Predicting on testing data 
+predictions_test <-  ifelse(probability_predictions_test > 0.5, "Yes", "No")
+
+## How many Y's and N's
+table(predictions_test)
+
+test_prediction_df_logistic <- cbind(Basketball_test$id,predictions_test) %>% data.frame()
+colnames(test_prediction_df_logistic) <- c("id","HTWins")
+
+write.csv(test_prediction_df_logistic,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-24_Logistic.csv') 
+```
+
+############################## 11.22 KNN ##############################
+```{r}
+
+library(class)
+normalize <- function(x){
+  (x -min(x))/(max(x)-min(x))
+}
+
+# Normalizing Training and Testing Data
+train_X_normalized <- lapply(Basketball_train[,c("VT.TS.tp.percentage","VT.TS.fg.percentage","HT.TS.fg.percentage","VT.TS.tp.percentage","HT.TS.tp.percentage","VT.TS.pts","HT.TS.pts","VT.TS.pf","HT.TS.pf","VT.TS.ast","HT.TS.ast","VT.TS.dreb","HT.TS.dreb","VT.TS.fta","HT.TS.fta"
+,"VT.TS.stl","HT.TS.stl")],normalize) %>% as.data.frame()
+
+test_X_normalized <- lapply(Basketball_test[,c("VT.TS.tp.percentage","VT.TS.fg.percentage","HT.TS.fg.percentage","VT.TS.tp.percentage","HT.TS.tp.percentage","VT.TS.pts","HT.TS.pts","VT.TS.pf","HT.TS.pf","VT.TS.ast","HT.TS.ast","VT.TS.dreb","HT.TS.dreb","VT.TS.fta","HT.TS.fta"
+,"VT.TS.stl","HT.TS.stl")],normalize) %>% as.data.frame()
+
+knn_predictions <-  knn(train_X_normalized, test_X_normalized, cl= Basketball_train$HTWins, k = 20)
+unique(knn_predictions)
+
+## How many Y's and N's
+table(knn_predictions)
+
+test_prediction_df_knn <- cbind(Basketball_test$id,as.character(knn_predictions)) %>% data.frame()
+colnames(test_prediction_df_knn) <- c("id","HTWins")
+
+write.csv(test_prediction_df_knn,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-24_knn.csv') 
+
+knn_predictions_5 <-  knn(train_X_normalized, test_X_normalized, cl= Basketball_train$HTWins, k = 5)
+
+test_prediction_df_knn <- cbind(Basketball_test$id,as.character(knn_predictions_5)) %>% data.frame()
+colnames(test_prediction_df_knn) <- c("id","HTWins")
+
+write.csv(test_prediction_df_knn,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-24_knn=5.csv') ### Scored .59 on Kaggle
+
+```
+
+```{r}
+knn_predictions_5 <-  knn(train_X_normalized, train_X_normalized, cl= Basketball_train$HTWins, k = 5)
+## Error Rate with k=5
+mean(knn_predictions_5 == Basketball_train$HTWins)
+
+knn_predictions_20 <-  knn(train_X_normalized, train_X_normalized, cl= Basketball_train$HTWins, k = 20)
+## Error Rate with k=20
+mean(knn_predictions_20 == Basketball_train$HTWins)
+
+knn_predictions_100 <-  knn(train_X_normalized, train_X_normalized, cl= Basketball_train$HTWins, k = 100)
+## Error Rate with k=100
+mean(knn_predictions_100 == Basketball_train$HTWins)
+
+knn_predictions_200 <-  knn(train_X_normalized, train_X_normalized, cl= Basketball_train$HTWins, k = 200)
+## Error Rate with k=200
+mean(knn_predictions_200 == Basketball_train$HTWins)
+
+```
+
+** K performs better for lower K's
 
