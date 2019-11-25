@@ -12,3 +12,23 @@
 
 - Could run VIF's against a variable that is starkly different from the set. 
 
+## Nish
+
+Attempts made: 
+1. Logistic regression with arbitrarily chosen predictors
+2. KNN with K=5 on columns 11:30
+
+Date of most recent submission: 
+
+
+## Karan 
+
+Attempts made: 
+
+Date of most recent submission: 
+
+## Will 
+
+Attempts made: 
+
+Date of most recent submission: 
