@@ -8,7 +8,7 @@
 - Since none of us are Basketball fantatics, we can probably find some literature explaining how the variables correlate. 
 - Response being categorical makes it hard to draw out correlations. 
 
-** Attempts at avoiding multicollinearity**
+**Attempts at avoiding multicollinearity**
 
 - Could run VIF's against a variable that is starkly different from the set. 
 
