@@ -1,0 +1,61 @@
+############################## READING THE FILE ##############################
+
+```{r}
+library(readr)
+Basketball_train <- read_csv("C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Datasets/Final Project/train.csv")
+
+Basketball_test <- read_csv("C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Datasets/Final Project/test.csv")
+
+attach(Basketball_train)
+
+dim(Basketball_train)
+dim(Basketball_test)
+
+```
+
+############################## LOGISTIC REGRESSION ##############################
+
+```{r}
+summary(Basketball_train)
+
+names(Basketball_train)
+
+logistic_basketball <- glm(factor(HTWins) ~ VTcumRest + HTcumRest+ VT.TS.fga + VT.TS.tpa + VT.OTA.fta + HT.OTA.fga + HT.TA.pts + VT.TA.pts, data= Basketball_train, family = "binomial")
+
+probability_predictions_training <- predict(logistic_basketball,newdata = Basketball_train,type = "response") # Predicting on training data 
+predictions_training <-  ifelse(probability_predictions_training > 0.5, "Yes", "No")
+mean(predictions_training != Basketball_train$HTWins) ## Training Error Rate
+
+probability_predictions_test <- predict(logistic_basketball,newdata = Basketball_test,type = "response") #Predicting on testing data 
+predictions_test <-  ifelse(probability_predictions_test > 0.5, "Yes", "No")
+
+library(dplyr)
+test_prediction_df_logistic <- cbind(Basketball_test$id,predictions_test) %>% data.frame()
+colnames(test_prediction_df_logistic) <- c("id","HTWins")
+
+write.csv(test_prediction_df_logistic,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-22_Logistic.csv') 
+```
+
+
+############################## KNN ##############################
+```{r}
+
+library(class)
+normalize <- function(x){
+  (x -min(x))/(max(x)-min(x))
+}
+
+# Normalizing Training and Testing Data
+train_X_normalized <- lapply(Basketball_train[,11:30],normalize) %>% as.data.frame()
+test_X_normalized <- lapply(Basketball_test[,11:30],normalize) %>% as.data.frame()
+
+knn_predictions <-  knn(train_X_normalized, test_X_normalized, cl= Basketball_train$HTWins, k = 5)
+unique(knn_predictions)
+
+test_prediction_df_knn <- cbind(Basketball_test$id,as.character(knn_predictions)) %>% data.frame()
+colnames(test_prediction_df_knn) <- c("id","HTWins")
+
+write.csv(test_prediction_df_knn,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-23_knn.csv') 
+```
+
+
