@@ -16,10 +16,14 @@
 
 Attempts made: 
 1. Logistic regression with arbitrarily chosen predictors
-2. KNN with K=5 on columns 11:30
+2. Logistic regression with predictors chosen by Regsubsetts (using a select supplied group of 16 predictors obtained from research)
+3. KNN with K=5 on columns 11:30
+4. Ridge 
+5. Lasso 
 
-Date of most recent submission: 11/24/19
+Date of most recent submission: 11/25/19
 
+Kaggle Score : Hit 0.68 with the Ridge Model 
 
 ## Karan 
 
