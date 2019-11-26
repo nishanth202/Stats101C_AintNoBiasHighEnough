@@ -23,6 +23,38 @@ sapply(Basketball_train, function(x) sum(is.na(x)))
 sum(duplicated(Basketball_train$gameID))
 
 ```
+ccc:
+(not all are included)
+min Minutes
+fgm Field Goals Made
+fga Field Goals Attempted
+tpm 3pt Shots Made
+tpa 3pt Shots Attempted
+fta Free Throws Attempted
+ftm Free Throws Made
+oreb Offensive Rebounds
+dreb Defensive Rebounds
+treb Team Rebounds
+ast Assists
+stl Steals
+blk Blocked Shots
+to Turn Overs
+pf Personal Fouls
+pts Total Points
+
+## Random Forest
+```{r}
+set.seed(1)
+
+which(is.na(Basketball_train),arr.ind = TRUE)
+
+library(randomForest)
+
+RF <- randomForest(x= Basketball_train[,-3],y = as.factor(Basketball_train$HTWins),ntree=100, importance = TRUE)
+
+randomForest(factor(HTWins) ~ . , data= Basketball_train,importance = TRUE)
+
+```
 
 ```{r}
 
@@ -253,3 +285,91 @@ mean(knn_predictions_200 == Basketball_train$HTWins)
 
 ** K performs better for lower K's
 
+############################## 11.25 Simple Check of HT score and VT Score ##############################
+```{r}
+karan_rocks <-  ifelse(Basketball_train$HT.TS.pts/Basketball_train$VT.TS.pts >= 1, "Yes","No")
+
+karan_rocks2 <-  ifelse(Basketball_train$VT.OTS.pts/Basketball_train$VT.TS.pts >1, "Yes","No")
+
+mean(karan_rocks == Basketball_train$HTWins)
+
+mean(karan_rocks2 == Basketball_train$HTWins)
+
+Basketball_train[1:10,c("HTWins","VT.TS.pts","HT.TS.pts")]
+
+```
+
+
+############################## 11.25 CV Lasso  ##############################
+
+```{r}
+library(glmnet)
+#convert training data to matrix format
+x <- model.matrix(HTWins~.,Basketball_train)
+#convert class to numerical variable
+y <- ifelse(Basketball_train$HTWins=="Yes",1,0)
+
+#perform grid search to find optimal value of lambda
+#family= binomial => logistic regression, alpha=1 => lasso
+# check docs to explore other type.measure options
+cv.out <- cv.glmnet(x,y,alpha=1,family="binomial",type.measure = "mse")
+
+#plot result
+plot(cv.out)
+
+lambda_min <- cv.out$lambda.min
+#best value of lambda
+lambda_1se <- cv.out$lambda.1se
+#regression coefficients
+coef(cv.out,s=lambda_min)
+
+Basketball_test$HTWins <- sample(c(1,0),nrow(Basketball_test),replace = TRUE, prob = c(0.5,0.5))
+
+x_test <- model.matrix(HTWins ~. ,Basketball_test)
+#predict class, type=”class”
+lasso_prob <- predict(cv.out,newx = x_test,s=lambda_min,type="response")
+#translate probabilities to predictions
+lasso_predict <- rep("No",nrow(Basketball_test))
+lasso_predict[lasso_prob>.5] <- "Yes"
+
+table(lasso_predict)
+
+test_prediction_df_lasso <- cbind(Basketball_test$id,as.character(lasso_predict)) %>% data.frame()
+colnames(test_prediction_df_lasso) <- c("id","HTWins")
+
+write.csv(test_prediction_df_lasso,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-25_Lasso.csv') ### Scored .671 on Kaggle
+
+
+```
+
+
+############################## 11.25 CV Ridge  ##############################
+
+```{r}
+
+cv.out_ridge <- cv.glmnet(x,y,alpha=0,family="binomial",type.measure = "mse")
+
+#plot result
+plot(cv.out_ridge)
+
+lambda_min <- cv.out_ridge$lambda.min
+#best value of lambda
+lambda_1se <- cv.out_ridge$lambda.1se
+#regression coefficients
+coef(cv.out_ridge,s=lambda_min)
+
+#predict class, type=”class”
+ridge_prob <- predict(cv.out_ridge,newx = x_test,s=lambda_1se,type="response")
+#translate probabilities to predictions
+ridge_predict <- rep("No",nrow(Basketball_test))
+ridge_predict[ridge_prob>=.5] <- "Yes"
+
+table(ridge_predict)
+
+test_prediction_df_ridge <- cbind(Basketball_test$id,as.character(ridge_predict)) %>% data.frame()
+colnames(test_prediction_df_ridge) <- c("id","HTWins")
+
+write.csv(test_prediction_df_ridge,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-25_Ridge.csv') ### Scored .59 on Kaggle
+
+
+```
