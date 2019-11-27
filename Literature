@@ -1,7 +1,7 @@
-## Literature 
+############################## LITERATURE ##############################
 
-# Nish
+## Nish
 
-1. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3796832/ - Look at abstract
-2. https://towardsdatascience.com/basketball-analytics-predicting-win-shares-7c155651e7cc
-3. https://ir.uiowa.edu/cgi/viewcontent.cgi?article=5572&context=etd
+1. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3796832/  (Look at abstract - tells us key variables to use. Feature selection but doesnt gives us a lot of new ones to engineer)
+2. https://towardsdatascience.com/basketball-analytics-predicting-win-shares-7c155651e7cc (has tables with recommended Stats to use) 
+3. https://ir.uiowa.edu/cgi/viewcontent.cgi?article=5572&context=etd (kinda useless tbh)
