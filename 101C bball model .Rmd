@@ -8,6 +8,7 @@ output: html_document
 Loading data and required packages
 
 ```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 getwd()
 setwd("/Users/frankzhu/dev/101C modelling/fall-2019-stats-101c")
 train = read.csv('train.csv')
@@ -16,12 +17,14 @@ test = read.csv('test.csv')
 library(ggplot2)
 library(dplyr)
 library(randomForest)
+library(class)
+library(glmnet)
 ```
 
 
 Combining the test and training dataset and removing ID vectors as they don't provide statistical insights.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 dim(train)
 dim(test)
 
@@ -36,8 +39,6 @@ all$gameID <- NULL
 summary(all)
 dim(all)
 str(all)
-
-plot(all$HTWins)
 ```
 
 Splitting Variables into groups.
@@ -51,73 +52,468 @@ HT_vars = names(all[,grepl("HT", names(all))])
 VT_team_vars_TS = names(all[,grepl("VT.TS", names(all))])
 VT_team_vars_TA = names(all[,grepl("VT.TA", names(all))])
 VT_team_vars_OTS = names(all[,grepl("VT.OTS", names(all))])
-VT_team_Vars_OTA = names(all[,grepl("VT.OTA", names(all))])
+VT_team_vars_OTA = names(all[,grepl("VT.OTA", names(all))])
 
 HT_team_vars_TS = names(all[,grepl("HT.TS", names(all))])
 HT_team_vars_TA = names(all[,grepl("HT.TA", names(all))])
 HT_team_vars_OTS = names(all[,grepl("HT.OTS", names(all))])
-HT_team_Vars_OTA = names(all[,grepl("HT.OTA", names(all))])
+HT_team_vars_OTA = names(all[,grepl("HT.OTA", names(all))])
 
 #HT and VT player variables
 VT_team_vars_S1 = names(all[,grepl("VT.S1", names(all))])
 VT_team_vars_S2 = names(all[,grepl("VT.S2", names(all))])
 VT_team_vars_S3 = names(all[,grepl("VT.S3", names(all))])
-VT_team_Vars_S4 = names(all[,grepl("VT.S4", names(all))])
-VT_team_Vars_S5 = names(all[,grepl("VT.S5", names(all))])
+VT_team_vars_S4 = names(all[,grepl("VT.S4", names(all))])
+VT_team_vars_S5 = names(all[,grepl("VT.S5", names(all))])
 
 VT_team_vars_OS1 = names(all[,grepl("VT.OS1", names(all))])
 VT_team_vars_OS2 = names(all[,grepl("VT.OS2", names(all))])
 VT_team_vars_OS3 = names(all[,grepl("VT.OS3", names(all))])
-VT_team_Vars_OS4 = names(all[,grepl("VT.OS4", names(all))])
-VT_team_Vars_OS5 = names(all[,grepl("VT.OS5", names(all))])
+VT_team_vars_OS4 = names(all[,grepl("VT.OS4", names(all))])
+VT_team_vars_OS5 = names(all[,grepl("VT.OS5", names(all))])
 
 HT_team_vars_S1 = names(all[,grepl("HT.S1", names(all))])
 HT_team_vars_S2 = names(all[,grepl("HT.S2", names(all))])
 HT_team_vars_S3 = names(all[,grepl("HT.S3", names(all))])
-HT_team_Vars_S4 = names(all[,grepl("HT.S4", names(all))])
-HT_team_Vars_S5 = names(all[,grepl("HT.S5", names(all))])
+HT_team_vars_S4 = names(all[,grepl("HT.S4", names(all))])
+HT_team_vars_S5 = names(all[,grepl("HT.S5", names(all))])
 
 HT_team_vars_OS1 = names(all[,grepl("HT.OS1", names(all))])
 HT_team_vars_OS2 = names(all[,grepl("HT.OS2", names(all))])
 HT_team_vars_OS3 = names(all[,grepl("HT.OS3", names(all))])
-HT_team_Vars_OS4 = names(all[,grepl("HT.OS4", names(all))])
-HT_team_Vars_OS5 = names(all[,grepl("HT.OS5", names(all))])
+HT_team_vars_OS4 = names(all[,grepl("HT.OS4", names(all))])
+HT_team_vars_OS5 = names(all[,grepl("HT.OS5", names(all))])
 
 #PMX Variables
 VT_pmx = names(all[,grepl("VT.pmx", names(all))])
 
 HT_pmx = names(all[,grepl("HT.pmx", names(all))])
-
-scale(all[,HT_team_vars_S1], center = T)
+names(all[,grepl("ft", names(all))])
 ```
 
 
 Feature Engineering
 
-The first thing i'm going to do is create a player efficiency variable. I'm basing this metric as a simplified version of NBA player efficiency formulas by doing a sum of pts,ast,and stl per minute.
+In this section I'll only be using the VT and HT variables under TS and TA.
+I wont be using OTS and OTA as each row already has VT.TS, HT.TS and VT.TA, HT.TA, so adding these two category of variable is in a sense reundant.
 
-I'm going to try it on the HT.S1 variables first
+So in summary for feature engineering, I'll be using TS variables as offensive stats and TA variables as defensive stats for both the visiting and offensive team.
+
+
+From Literature Review:
+---
+According to the statistics in a study by Wilson (1948), nearly all
+basketball games were won by the team that secured a higher
+percentage of rebounds, both offensively and defensively. A few
+years later, however, Galatin (1954) found that two of the most
+important criteria in winning or losing basketball games on the
+high school, college, and professional levels were the number of
+field goals scored and the number of field goals attempted
+---
+
+---
+Through detailed analysis the variables with high influence on game effectiveness were selected for final procedures. It has been proven that a limited number of factors, mostly offensive, determines sports performance in the NBA. The most critical indicators are: Win%, Offensive EFF, 3rd Quarter PPG, Win% CG, Avg Fauls and Avg Steals.
+---
+
+The paper: 
+
+AU  - Zimmermann, Albrecht
+AU  - Moorthy, Sruthi
+AU  - Shi, Zifan
+PY  - 2013/10/14
+T1  - Predicting college basketball match outcomes using machine learning techniques: some results and lessons learned
+
+outlines multiple statistics in section 2 that I will engineer with the given variables:
+  - Possessions
+  - Offensive Efficiency
+  - Defensive Efficiency
+  - Effective field goal percentage
+  - Turnover percentage
+  - Offensive Rebound Percentage
+  - Free throw rate
+  - Win Percent (%) ***
+  - Adjusted Offensive Efficiency ***
+  - Adjusted Defensive Efficiency ***
+  - Win Probability ***
+  
+  - Player Offensive Rebound Rate ***
+  - Player Defensive Rebound Rate ***
+  - Assist/Turnover/Steal/Block Rate ***
+
+*** stats still need to be made
+
+The defensive stats will be calculated with Team Allowed variables
+The offensive stats will be calculated with Team Scored variables
+
 ```{r}
+#Offensive Possesions
+attach(all)
+all <- all %>%  mutate(HT.TS.possesions = 0.96 * (HT.TS.fga - HT.TS.oreb - HT.TS.to + (0.475*HT.TS.fta)), 
+                       VT.TS.possesions = 0.96 * (VT.TS.fga - VT.TS.oreb - VT.TS.to + (0.475*VT.TS.fta)))
 
-all[, HT_team_vars_S1]
+all[,"HT.TS.fga"]
+#Defensive Possessions
+all <- all %>%  mutate(HT.TA.possesions = 0.96 * (HT.TA.fga - HT.TA.oreb - HT.TA.to +   (0.475*HT.TA.fta)), 
+                       VT.TA.possesions = 0.96 * (VT.TA.fga - VT.TA.oreb - VT.TA.to + (0.475*VT.TA.fta)))
+
+#Offensive Efficiency
+all <- all %>%  mutate(HT.off_eff = HT.TS.pts *100 / HT.TS.possesions, 
+                       VT.off_eff = VT.TS.pts *100 / VT.TS.possesions)
+
+#Defensive Efficiency
+all <- all %>%  mutate(HT.def_eff = HT.TA.pts *100 / HT.TA.possesions, 
+                       VT.def_eff = VT.TA.pts *100 / VT.TA.possesions)
+
+#Effective Offensive Field Goal Percentage
+all <- all %>%  mutate(HT.TS.efg_percent = (HT.TS.fgm + 0.5*3*HT.TS.tpm)/HT.TS.fga,
+                       VT.TS.efg_percent = (VT.TS.fgm + 0.5*3*VT.TS.tpm)/VT.TS.fga)
+
+#Turnover Percentage
+all <- all %>%  mutate(HT.TS.to_percent = HT.TS.to/HT.TS.possesions,
+                       VT.TS.to_percent = VT.TS.to/VT.TS.possesions)
+
+#Offensive Rebound Percentage
+all <- all %>%  mutate(HT.TS.oreb_percent = HT.TS.oreb/(HT.TS.oreb+VT.TS.dreb),
+                       VT.TS.oreb_percent = VT.TS.oreb/(VT.TS.oreb+HT.TS.dreb))
+
+#Free Throw Rate
+all <- all %>%  mutate(HT.TS.ftr = HT.TS.fta/HT.TS.fga,
+                       VT.TS.ftr = VT.TS.fta/VT.TS.fga)
+
+#Offensive Field Goal Conversion
+all <- all %>%  mutate(VT.TS.fg_percentage = VT.TS.fgm/VT.TS.fga, 
+                       HT.TS.fg_percentage = HT.TS.fgm/HT.TS.fga)
+
+#Field Goals Allowed Percentage
+all <- all %>%  mutate(VT.TA.fg_percentage = VT.TA.fgm/VT.TS.fga, 
+                       HT.TA.fg_percentage = HT.TA.fgm/HT.TA.fga)
+
+#Three Point Conversion
+all <- all %>% mutate(VT.TS.tp_percentage = VT.TS.tpm/VT.TS.tpa ,
+                      HT.TS.tp_percentage = HT.TS.tpm/HT.TS.tpa) 
+
+#Three Point Allowed Percentage
+all <- all %>%  mutate(VT.TA.tp_percentage = VT.TA.tpm/VT.TS.tpa, 
+                       HT.TA.tp_percentage = HT.TA.tpm/HT.TA.tpa)
+
 ```
+
+Creating player variables
+
+I'm first going to join:
+  - HT.S# player variables with VT.OS# player variables by plmin as a shared column
+  - VT.S# and HT.OS# by plmin
+
+```{r}
+#Visiting Team Players
+
+VT.player1 = data.frame(all[,VT_team_vars_S1], all[,HT_team_vars_OS1[-1]])
+colnames(VT.player1) <- sub("HT.OS1.", "VT.S1.", colnames(VT.player1))
+
+VT.player2 = data.frame(all[,VT_team_vars_S2], all[,HT_team_vars_OS2[-1]])
+colnames(VT.player2) <- sub("HT.OS2.", "VT.S2.", colnames(VT.player2))
+
+VT.player3 = data.frame(all[,VT_team_vars_S3], all[,HT_team_vars_OS3[-1]])
+colnames(VT.player3) <- sub("HT.OS3.", "VT.S3.", colnames(VT.player3))
+
+VT.player4 = data.frame(all[,VT_team_vars_S4], all[,HT_team_vars_OS4[-1]])
+colnames(VT.player4) <- sub("HT.OS4.", "VT.S4.", colnames(VT.player4))
+
+VT.player5 = data.frame(all[,VT_team_vars_S5], all[,HT_team_vars_OS5[-1]])
+colnames(VT.player5) <- sub("HT.OS5.", "VT.S5.", colnames(VT.player5))
+
+HT.player1 = data.frame(all[,HT_team_vars_S1], all[,VT_team_vars_OS1[-1]])
+colnames(HT.player1) <- sub("VT.OS1.", "HT.S1.", colnames(HT.player1))
+
+HT.player2 = data.frame(all[,HT_team_vars_S2], all[,VT_team_vars_OS2[-1]])
+colnames(HT.player2) <- sub("VT.OS2.", "HT.S2.", colnames(HT.player2))
+
+HT.player3 = data.frame(all[,HT_team_vars_S3], all[,VT_team_vars_OS3[-1]])
+colnames(HT.player3) <- sub("VT.OS3.", "HT.S3.", colnames(HT.player3))
+
+HT.player4 = data.frame(all[,HT_team_vars_S4], all[,VT_team_vars_OS4[-1]])
+colnames(HT.player4) <- sub("VT.OS4.", "HT.S4.", colnames(HT.player4))
+
+HT.player5 = data.frame(all[,HT_team_vars_S5], all[,VT_team_vars_OS5[-1]])
+colnames(HT.player5) <- sub("VT.OS5.", "HT.S5.", colnames(HT.player5))
+```
+
+
+Adding in these variables:
+
+Offensive Rebounds:
+  - For Team Scored variables
+  - For Team Allowed variables
+
+Defensive Rebounds:
+  - For Team Scored variables
+  - For Team Allowed variables
+  
+Assists:
+  - For Team Scored variables
+  - For Team Allowed variables
+
+Steals:
+  - For Team Scored variables
+  - For Team Allowed variables
+
+Turnovers:
+  - For Team Scored variables
+  - For Team Allowed variables
+
+Personal Fouls:
+  - For Team Scored variables
+  - For Team Allowed variables
+  
+Block to Turnovers:
+  - For Team Scored variables
+  - For Team Allowed variables
+  
+Total Points:
+  - For Team Scored variables
+  - For Team Allowed variables
+  
+Player Plus Minus (a general measure of how effective player is)
+  - For Visiting Team Players 1-5
+  - For Home Team Players 1-5
+
+Offensive and Defensive difficulty of Past Games:
+  - For Visiting Team
+  - For Home Team
+
+```{r}
+team.offense.df <- data.frame(all[,HT_team_vars_TS[6:13]],
+                              all[,VT_team_vars_TS[6:13]],
+                              all[,'HT.off_eff'],
+                              all[,'VT.off_eff'],
+                              all[,'HT.TS.possesions'],
+                              all[,'VT.TS.possesions'],
+                              all[,'HT.TS.efg_percent'],
+                              all[,'VT.TS.efg_percent'],
+                              all[,'HT.TS.to_percent'],
+                              all[,'VT.TS.to_percent'],
+                              all[,'HT.TS.oreb_percent'],
+                              all[,'VT.TS.oreb_percent'],
+                              all[,'HT.TS.ftr'],
+                              all[,'VT.TS.ftr'],
+                              all[,'HT.TS.fg_percentage'],
+                              all[,'VT.TS.fg_percentage'],
+                              all[,'HT.TS.tp_percentage'],
+                              all[,'VT.TS.tp_percentage'])
+
+team.defense.df <- data.frame(all[,HT_team_vars_TA[6:13]],
+                              all[,VT_team_vars_TA[6:13]],
+                              all[,'HT.def_eff'],
+                              all[,'VT.def_eff'],
+                              all[,'HT.TA.possesions'],
+                              all[,'VT.TA.possesions'],
+                              all[,'HT.TA.fg_percentage'],
+                              all[,'VT.TA.fg_percentage'],
+                              all[,'HT.TA.tp_percentage'],
+                              all[,'VT.TA.tp_percentage'])
+
+
+player.var = data.frame(VT.player1,
+                        VT.player2,
+                        VT.player3,
+                        VT.player4,
+                        VT.player5,
+                        HT.player1,
+                        HT.player2,
+                        HT.player3,
+                        HT.player4,
+                        HT.player5)
+
+other.var  = data.frame(all[,'HTWins'],
+                        all[,'VT'],
+                        all[,'HT'],
+                        all[,'VTleague'],
+                        all[,'HTleague'],
+                        all[,'VTcumRest'],
+                        all[,'HTcumRest']
+                        )
+```
+
+DataFrame library
+
+```{r}
+#Full Condensed Dataframe
+full.df = data.frame(other.var,
+                     team.offense.df,
+                     team.defense.df,
+                     player.var
+                     )
+
+colnames(full.df) <- sub("all....", "", colnames(full.df))
+
+train.full.df = full.df[1:9520,]
+test.full.df = full.df[9521:11168,]
+
+
+#Feature Engineered Dataframe
+
+FE.df = data.frame(all[,'HTWins'],
+                       team.offense.df[,-c(1:16)],
+                       team.defense.df[,-c(1:16)]
+                       )
+colnames(FE.df) <- sub("all....", "", colnames(FE.df))
+
+train.FE.df = FE.df[1:9520,]
+test.FE.df = FE.df[9521:11168,]
+
+```
+
+
+
+
+
+Variable Selection by Random Forest
 
 ```{r}
 set.seed(2019) 
-summary(all)
-dim(all)
-which(is.na(all), arr.ind=TRUE)
-quick_RF <- randomForest(x=all[1:9520,], y=all$HTWins[1:9520], ntree=100,importance=TRUE)
-imp_RF <- importance(quick_RF)
-imp_DF <- data.frame(Variables = row.names(imp_RF), MSE = imp_RF[,1])
-imp_DF <- imp_DF[order(imp_DF$MSE, decreasing = TRUE),]
+quick_RF.full <- randomForest(x=train.full.df[,-1], y=train.full.df$HTWins, ntree=100, importance=TRUE)
+imp_RF.full <- importance(quick_RF.full)
+imp_DF.full <- data.frame(Variables = row.names(imp_RF.full), MSE = imp_RF.full[,1])
+imp_DF.full <- imp_DF.full[order(imp_DF.full$MSE, decreasing = TRUE),]
 
-ggplot(imp_DF[1:20,], aes(x=reorder(Variables, MSE), y=MSE, fill=MSE)) + geom_bar(stat = 'identity') + labs(x = 'Variables', y= '% increase MSE if variable is randomly permuted') + coord_flip() + theme(legend.position="none")
+ggplot(imp_DF.full[1:20,], aes(x=reorder(Variables, MSE), y=MSE, fill=MSE)) + geom_bar(stat = 'identity') + labs(x = 'Variables', y= '% increase MSE if variable is randomly permuted') + coord_flip() + theme(legend.position="none")
 
-all[1:5,  c('VT','HT')]
+sel.var.full = imp_DF.full[imp_DF.full$MSE >2, ]
+as.vector(sel.var.full$Variables)
+
+RF.full.train = train.full.df[,c(as.vector(sel.var.full$Variables))]
+RF.full.train = data.frame(RF.full.train, train.full.df[,'HTWins..'])
+
+RF.full.test = test.full.df[,c(as.vector(sel.var.full$Variables))]
 
 
+
+####
+quick_RF.FE <- randomForest(x=train.FE.df[,-1], y=train.FE.df$HTWins, ntree=100, importance=TRUE)
+imp_RF.FE <- importance(quick_RF.FE)
+imp_DF.FE <- data.frame(Variables = row.names(imp_RF.FE), MSE = imp_RF.FE[,1])
+imp_DF.FE <- imp_DF.FE[order(imp_DF.FE$MSE, decreasing = TRUE),]
+
+ggplot(imp_DF.FE[1:20,], aes(x=reorder(Variables, MSE), y=MSE, fill=MSE)) + geom_bar(stat = 'identity') + labs(x = 'Variables', y= '% increase MSE if variable is randomly permuted') + coord_flip() + theme(legend.position="none")
+
+sel.var.FE = imp_DF.FE[imp_DF.FE$MSE >0, ]
+as.vector(sel.var.FE$Variables)
+
+RF.FE.train = train.FE.df[,c(as.vector(sel.var.FE$Variables))]
+RF.FE.train = data.frame(RF.FE.train, train.FE.df[,'HTWins..'])
+
+RF.FE.test = test.FE.df[,c(as.vector(sel.var.FE$Variables))]
 ```
 
+
+```{r}
+names(RF.full.train)
+RF.full.test
+colnames(RF.full.train) <- sub("train.full.df....", "", colnames(RF.full.train))
+
+
+
+RF.FE.train
+colnames(RF.FE.train) <- sub("train.FE.df....", "", colnames(RF.FE.train))
+
+RF.FE.test
+```
+Step-Wise Regression
+```{r}
+base.mod <- glm(HTWins ~ 1 , data= new.var.train, family = "binomial")  # base intercept only model
+all.mod <- glm(HTWins ~ . , data= new.var.train, family = "binomial") # full model with all predictors
+stepMod <- step(base.mod, scope = list(lower = base.mod, upper = all.mod), direction = "both", trace = 0, steps = 1000)  # perform step-wise algorithm
+?step
+shortlistedVars <- names(unlist(stepMod[[1]])) # get the shortlisted variable.
+shortlistedVars <- shortlistedVars[!shortlistedVars %in% "(Intercept)"]  # remove intercept 
+print(shortlistedVars)
+```
+
+
+```{r}
+x <- model.matrix(HTWins....~.,RF.full.train)
+#convert class to numerical variable
+y <- ifelse(RF.full.train$HTWins....=="Yes",1,0)
+
+#perform grid search to find optimal value of lambda
+#family= binomial => logistic regression, alpha=1 => lasso
+# check docs to explore other type.measure options
+
+cv.out_ridge <- cv.glmnet(x,y,alpha=1,family="binomial",type.measure = "mse")
+
+plot(cv.out_ridge)
+
+lambda_min <- cv.out_ridge$lambda.min
+#best value of lambda
+lambda_1se <- cv.out_ridge$lambda.1se
+#regression coefficients
+coef(cv.out_ridge,s=lambda_min)
+
+
+
+
+RF.full.test$HTWins <- sample(c(1,0),nrow(RF.full.test),replace = TRUE, prob = c(0.5,0.5))
+x_test <- model.matrix(HTWins ~. ,RF.full.test)
+
+
+#predict class, type=”class”
+ridge_prob <- predict(cv.out_ridge,newx = x_test,s=lambda_1se,type="response")
+#translate probabilities to predictions
+ridge_predict <- rep("No",nrow(RF.full.test))
+ridge_predict[ridge_prob>=.5] <- "Yes"
+table(ridge_predict)
+class(test_labels)
+length(RF.full.test$VT..)
+test_prediction_df_ridge <- data.frame(test$id, ridge_predict)
+
+colnames(test_prediction_df_ridge) <- c("id","HTWins")
+test_prediction_df_ridge$id = as.character(test_prediction_df_ridge$id)
+class(test_prediction_df_ridge$id)
+
+write.csv(test_prediction_df_ridge,file = 'ridge.RF2.full.csv', row.names = F) ### Scored .59 on Kaggle
+```
+
+
+```{r}
+x <- model.matrix(HTWins....~.,RF.FE.train)
+#convert class to numerical variable
+y <- ifelse(RF.FE.train$HTWins....=="Yes",1,0)
+
+#perform grid search to find optimal value of lambda
+#family= binomial => logistic regression, alpha=1 => lasso
+# check docs to explore other type.measure options
+
+cv.out_ridge <- cv.glmnet(x,y,alpha=0,family="binomial",type.measure = "mse")
+
+plot(cv.out_ridge)
+
+lambda_min <- cv.out_ridge$lambda.min
+#best value of lambda
+lambda_1se <- cv.out_ridge$lambda.1se
+#regression coefficients
+coef(cv.out_ridge,s=lambda_min)
+
+
+
+
+RF.FE.test$HTWins <- sample(c(1,0),nrow(RF.FE.test ),replace = TRUE, prob = c(0.5,0.5))
+x_test <- model.matrix(HTWins ~. ,RF.FE.test)
+
+
+#predict class, type=”class”
+ridge_prob <- predict(cv.out_ridge,newx = x_test,s=lambda_1se,type="response")
+#translate probabilities to predictions
+ridge_predict <- rep("No",nrow(RF.full.test))
+ridge_predict[ridge_prob>=.5] <- "Yes"
+table(ridge_predict)
+class(test_labels)
+test_prediction_df_ridge <- data.frame(test$id, ridge_predict)
+
+colnames(test_prediction_df_ridge) <- c("id","HTWins")
+test_prediction_df_ridge$id = as.character(test_prediction_df_ridge$id)
+class(test_prediction_df_ridge$id)
+
+write.csv(test_prediction_df_ridge,file = 'ridge.RF0.FE.csv', row.names = F) ### Scored .59 on Kaggle
+```
 
 
