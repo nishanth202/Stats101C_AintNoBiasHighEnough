@@ -22,8 +22,7 @@ sapply(Basketball_train, function(x) sum(is.na(x))) ## There are no NA's
 ## Are there repeat Game ID's
 sum(duplicated(Basketball_train$gameID)) # No
 
-
-####################### Creating Field Goal % and 3-pointer % for both HT and VT ############################
+############################## Creating Field Goal % and 3-pointer % for both HT and VT ##############################
 ```{r}
 
 Basketball_train <- Basketball_train %>%  mutate(VT.TS.fg.percentage = VT.TS.fgm/VT.TS.fga, HT.TS.fg.percentage = HT.TS.fgm/HT.TS.fga)
