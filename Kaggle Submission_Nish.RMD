@@ -1,7 +1,7 @@
 ---
 title: "Stats 101C_Final Project"
 author: "Nishanth Shetty"
-date: "November 21, 2019"
+date: "Dec 8th, 2019"
 output: html_document
 ---
 
@@ -17,76 +17,24 @@ dim(Basketball_train)
 dim(Basketball_test)
 
 ## Checking for NA's
-sapply(Basketball_train, function(x) sum(is.na(x)))
+sapply(Basketball_train, function(x) sum(is.na(x))) ## There are no NA's
 
 ## Are there repeat Game ID's
-sum(duplicated(Basketball_train$gameID))
+sum(duplicated(Basketball_train$gameID)) # No
 
-```
-ccc:
-(not all are included)
-min Minutes
-fgm Field Goals Made
-fga Field Goals Attempted
-tpm 3pt Shots Made
-tpa 3pt Shots Attempted
-fta Free Throws Attempted
-ftm Free Throws Made
-oreb Offensive Rebounds
-dreb Defensive Rebounds
-treb Team Rebounds
-ast Assists
-stl Steals
-blk Blocked Shots
-to Turn Overs
-pf Personal Fouls
-pts Total Points
 
-## Random Forest
-```{r}
-set.seed(1)
-
-which(is.na(Basketball_train),arr.ind = TRUE)
-
-library(randomForest)
-
-RF <- randomForest(x= Basketball_train[,-3],y = as.factor(Basketball_train$HTWins),ntree=100, importance = TRUE)
-
-randomForest(factor(HTWins) ~ . , data= Basketball_train,importance = TRUE)
-
-```
-
+####################### Creating Field Goal % and 3-pointer % for both HT and VT ############################
 ```{r}
 
 Basketball_train <- Basketball_train %>%  mutate(VT.TS.fg.percentage = VT.TS.fgm/VT.TS.fga, HT.TS.fg.percentage = HT.TS.fgm/HT.TS.fga)
 
 Basketball_train <- Basketball_train %>%  mutate(VT.TS.tp.percentage = VT.TS.tpm/VT.TS.tpa ,HT.TS.tp.percentage = HT.TS.tpm/HT.TS.tpa) 
 
-# How many duplicated Game ID's
-sum(duplicated(Basketball_train$gameID))
-
 Basketball_test <- Basketball_test %>%  mutate(VT.TS.fg.percentage = VT.TS.fgm/VT.TS.fga, HT.TS.fg.percentage = HT.TS.fgm/HT.TS.fga)
 
 Basketball_test <- Basketball_test %>%  mutate(VT.TS.tp.percentage = VT.TS.tpm/VT.TS.tpa ,HT.TS.tp.percentage = HT.TS.tpm/HT.TS.tpa) 
 
 ```
-
-ccc:
-
-fg.percentage % Field Goals Made **
-tp.percentage % 3 Points Made ** 
-fta Free Throws Attempted **
-ftm Free Throws Made **
-oreb Offensive Rebounds
-dreb Defensive Rebounds
-treb Team Rebounds ** 
-ast Assists **
-stl Steals **
-blk Blocked Shots **
-to Turn Overs 
-pf Personal Fouls ** 
-pts Total Points **
-
 
 ############################## 11.22 LOGISTIC REGRESSION ##############################
 
@@ -110,123 +58,6 @@ test_prediction_df_logistic <- cbind(Basketball_test$id,predictions_test) %>% da
 colnames(test_prediction_df_logistic) <- c("id","HTWins")
 
 write.csv(test_prediction_df_logistic,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-22_Logistic.csv') 
-```
-
-
-############################## 11.22 KNN ##############################
-```{r}
-
-library(class)
-normalize <- function(x){
-  (x -min(x))/(max(x)-min(x))
-}
-
-# Normalizing Training and Testing Data
-train_X_normalized <- lapply(Basketball_train[,11:30],normalize) %>% as.data.frame()
-test_X_normalized <- lapply(Basketball_test[,11:30],normalize) %>% as.data.frame()
-
-knn_predictions <-  knn(train_X_normalized, test_X_normalized, cl= Basketball_train$HTWins, k = 5)
-unique(knn_predictions)
-
-test_prediction_df_knn <- cbind(Basketball_test$id,as.character(knn_predictions)) %>% data.frame()
-colnames(test_prediction_df_knn) <- c("id","HTWins")
-
-write.csv(test_prediction_df_knn,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-23_knn.csv') 
-```
-
-
-Most significant predictors from Literature: 
-
-VT.TS.fg.percentage
-HT.TS.fg.percentage
-VT.TS.tp.percentage
-HT.TS.tp.percentage
-VT.TS.pts
-HT.TS.pts
-VT.TS.pf
-HT.TS.pf
-VT.TS.ast
-HT.TS.ast
-VT.TS.dreb
-HT.TS.dreb
-VT.TS.fta
-HT.TS.fta
-VT.TS.stl
-HT.TS.stl
-
-## Regsubsets to find the best subset
-```{r}
-library(leaps)
-
-names(Basketball_train)
-
-nr <- regsubsets(VT.TA.to ~ HTcumRest + VT.TS.fgm+VT.TS.fga+VT.TS.tpm+VT.TS.tpa, data = Basketball_train, method = "exhaustive")
-
-nish_rgs <- regsubsets(as.factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
-+VT.TS.tp.percentage
-+HT.TS.tp.percentage
-+VT.TS.pts
-+HT.TS.pts
-+VT.TS.pf
-+HT.TS.pf
-+VT.TS.ast
-+HT.TS.ast
-+VT.TS.dreb
-+HT.TS.dreb
-+VT.TS.fta
-+HT.TS.fta
-+VT.TS.stl
-+HT.TS.stl, data = Basketball_train, method = "exhaustive")
-
-dim(Basketball_test)
-nish_rgs_summary <- summary(nish_rgs)
-plot(1:8,nish_rgs_summary$bic,type = "b")
-
-which.min(nish_rgs_summary$bic)
-
-
-library(corrplot)
-corrplot(cor(Weekly[,-9]), method = "number")
-
-corrplot(cor(Basketball_train[,c("VT.TS.tp.percentage","VT.TS.fg.percentage","HT.TS.fg.percentage","VT.TS.tp.percentage","HT.TS.tp.percentage","VT.TS.pts","HT.TS.pts","VT.TS.pf","HT.TS.pf","VT.TS.ast","HT.TS.ast","VT.TS.dreb","HT.TS.dreb","VT.TS.fta","HT.TS.fta"
-,"VT.TS.stl","HT.TS.stl")]), method = "number")
-
-```
-* The best subset is the full model 
-
-############################## 11.24 LOGISTIC REGRESSION ##############################
-
-```{r}
-logistic_basketball_11.24 <- glm(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
-+VT.TS.tp.percentage
-+HT.TS.tp.percentage
-+VT.TS.pts
-+HT.TS.pts
-+VT.TS.pf
-+HT.TS.pf
-+VT.TS.ast
-+HT.TS.ast
-+VT.TS.dreb
-+HT.TS.dreb
-+VT.TS.fta
-+HT.TS.fta
-+VT.TS.stl
-+HT.TS.stl, data= Basketball_train, family = "binomial")
-
-probability_predictions_training <- predict(logistic_basketball_11.24,newdata = Basketball_train,type = "response") # Predicting on training data 
-predictions_training <-  ifelse(probability_predictions_training > 0.5, "Yes", "No")
-mean(predictions_training != Basketball_train$HTWins) ## Training Error Rate
-
-probability_predictions_test <- predict(logistic_basketball_11.24,newdata = Basketball_test,type = "response") #Predicting on testing data 
-predictions_test <-  ifelse(probability_predictions_test > 0.5, "Yes", "No")
-
-## How many Y's and N's
-table(predictions_test)
-
-test_prediction_df_logistic <- cbind(Basketball_test$id,predictions_test) %>% data.frame()
-colnames(test_prediction_df_logistic) <- c("id","HTWins")
-
-write.csv(test_prediction_df_logistic,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-24_Logistic.csv') 
 ```
 
 ############################## 11.22 KNN ##############################
@@ -263,6 +94,7 @@ colnames(test_prediction_df_knn) <- c("id","HTWins")
 write.csv(test_prediction_df_knn,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-24_knn=5.csv') ### Scored .59 on Kaggle
 
 ```
+############################## 11.22 KNN with 5, 20, 100, 200 ##############################
 
 ```{r}
 knn_predictions_5 <-  knn(train_X_normalized, train_X_normalized, cl= Basketball_train$HTWins, k = 5)
@@ -285,27 +117,12 @@ mean(knn_predictions_200 == Basketball_train$HTWins)
 
 ** K performs better for lower K's
 
-############################## 11.25 Simple Check of HT score and VT Score ##############################
-```{r}
-karan_rocks <-  ifelse(Basketball_train$HT.TS.pts/Basketball_train$VT.TS.pts >= 1, "Yes","No")
-
-karan_rocks2 <-  ifelse(Basketball_train$VT.OTS.pts/Basketball_train$VT.TS.pts >1, "Yes","No")
-
-mean(karan_rocks == Basketball_train$HTWins)
-
-mean(karan_rocks2 == Basketball_train$HTWins)
-
-Basketball_train[1:10,c("HTWins","VT.TS.pts","HT.TS.pts")]
-
-```
-
-
 ############################## 11.25 CV Lasso  ##############################
 
 ```{r}
 library(glmnet)
 #convert training data to matrix format
-x <- model.matrix(HTWins~.,Basketball_train)
+x <- model.matrix(HTWins~.-HT - VT,Basketball_train)
 #convert class to numerical variable
 y <- ifelse(Basketball_train$HTWins=="Yes",1,0)
 
@@ -325,8 +142,8 @@ coef(cv.out,s=lambda_min)
 
 Basketball_test$HTWins <- sample(c(1,0),nrow(Basketball_test),replace = TRUE, prob = c(0.5,0.5))
 
-x_test <- model.matrix(HTWins ~. ,Basketball_test)
-#predict class, type=”class”
+x_test <- model.matrix(HTWins ~. -HT - VT,Basketball_test)
+
 lasso_prob <- predict(cv.out,newx = x_test,s=lambda_min,type="response")
 #translate probabilities to predictions
 lasso_predict <- rep("No",nrow(Basketball_test))
@@ -339,9 +156,17 @@ colnames(test_prediction_df_lasso) <- c("id","HTWins")
 
 write.csv(test_prediction_df_lasso,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-25_Lasso.csv') ### Scored .671 on Kaggle
 
+dom <- coef(cv.out,s=lambda_min) %>% data.matrix() %>% data.frame()
+
+## Selecting most important coefficients 
+dom_names <- data.frame(rownames(dom))
+dom <- bind_cols(dom_names,dom) 
+colnames(dom) <- c("nini","juju")
+dom %>% select(.,juju >0)
+dom[dom$juju>0.05,] %>% arrange(desc(juju)) ## Selecting most important coefficients from Lasso 
+
 
 ```
-
 
 ############################## 11.25 CV Ridge  ##############################
 
@@ -358,7 +183,6 @@ lambda_1se <- cv.out_ridge$lambda.1se
 #regression coefficients
 coef(cv.out_ridge,s=lambda_min)
 
-#predict class, type=”class”
 ridge_prob <- predict(cv.out_ridge,newx = x_test,s=lambda_1se,type="response")
 #translate probabilities to predictions
 ridge_predict <- rep("No",nrow(Basketball_test))
@@ -369,7 +193,332 @@ table(ridge_predict)
 test_prediction_df_ridge <- cbind(Basketball_test$id,as.character(ridge_predict)) %>% data.frame()
 colnames(test_prediction_df_ridge) <- c("id","HTWins")
 
-write.csv(test_prediction_df_ridge,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-25_Ridge.csv') ### Scored .59 on Kaggle
+write.csv(test_prediction_df_ridge,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-25_Ridge.csv') ### Scored .68 on Kaggle
 
+
+```
+
+############################## 12.8 LDA with selected variables obtained from Lasso analysis  ##############################
+
+```{r}
+
+basketball_lda_2 <- lda(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl
++VT.pmxW
++HT.pmxW
++VT.OTA.blk
++HT.OTA.blk
++HT.S1.pts
++VT.S1.pts
++HT.S1.plmin
++VT.S1.plmin
++HT.S1.ast
++VT.S1.ast
+  , data= Basketball_train, family = "binomial")
+
+predictions_lda_2 = predict(basketball_lda_2, newdata = Basketball_test)$class
+
+lda_success_rate_2 <- mean(predictions_lda_2 == Basketball_train$HTWins)
+lda_success_rate_2
+
+table(predictions_lda_2)
+
+test_prediction_lda_df <- cbind(Basketball_test$id,as.character(predictions_lda_2)) %>% data.frame()
+colnames(test_prediction_lda_df) <- c("id","HTWins")
+
+write.csv(test_prediction_lda_df,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_12-8_LDA.csv') ### Scored .65 on Kaggle
+
+
+```
+
+############################## 12.8 QDA with selected variables obtained from Lasso analysis  ##############################
+
+```{r}
+
+basketball_qda_1 <- qda(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl
++VT.pmxW
++HT.pmxW
++VT.OTA.blk
++HT.OTA.blk
++HT.S1.pts
++VT.S1.pts
++HT.S1.plmin
++VT.S1.plmin
++HT.S1.ast
++VT.S1.ast
+  , data= Basketball_train)
+
+predictions_qda_1 = predict(basketball_qda_1, newdata = Basketball_test)$class
+
+qda_success_rate_1 <- mean(predictions_qda_1 == Basketball_train$HTWins)
+qda_success_rate_1
+
+table(predictions_qda_1)
+
+test_prediction_qda_df <- cbind(Basketball_test$id,as.character(predictions_qda_1)) %>% data.frame()
+colnames(test_prediction_qda_df) <- c("id","HTWins")
+
+write.csv(test_prediction_qda_df,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_12-8_QDA.csv') ## Scored 0.60
+
+```
+
+############################## 12.8 CV Lasso - using select subset of data obtained from Lasso ##############################
+
+```{r}
+library(glmnet)
+#convert training data to matrix format
+x <- model.matrix(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl
++VT.pmxW
++HT.pmxW
++VT.OTA.blk
++HT.OTA.blk
++HT.S1.pts
++VT.S1.pts
++HT.S1.plmin
++VT.S1.plmin
++HT.S1.ast
++VT.S1.ast
+  ,Basketball_train)
+#convert class to numerical variable
+y <- ifelse(Basketball_train$HTWins=="Yes",1,0)
+
+#perform grid search to find optimal value of lambda
+#family= binomial => logistic regression, alpha=1 => lasso
+# check docs to explore other type.measure options
+cv.out <- cv.glmnet(x,y,alpha=1,family="binomial",type.measure = "mse")
+
+#plot result
+plot(cv.out)
+
+lambda_min <- cv.out$lambda.min
+#best value of lambda
+lambda_1se <- cv.out$lambda.1se
+#regression coefficients
+coef(cv.out,s=lambda_min)
+
+Basketball_test$HTWins <- sample(c(1,0),nrow(Basketball_test),replace = TRUE, prob = c(0.5,0.5))
+
+x_test <- model.matrix(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl
++VT.pmxW
++HT.pmxW
++VT.OTA.blk
++HT.OTA.blk
++HT.S1.pts
++VT.S1.pts
++HT.S1.plmin
++VT.S1.plmin
++HT.S1.ast
++VT.S1.ast
+  ,Basketball_train)
+
+lasso_prob <- predict(cv.out,newx = x_test,s=lambda_min,type="class")
+#translate probabilities to predictions
+lasso_predict <- ifelse(lasso_prob=="1","Yes","No")
+
+
+table(lasso_predict)
+
+mean(lasso_predict == Basketball_train$HTWins,na.rm=TRUE)
+
+test_prediction_df_lasso <- cbind(Basketball_test$id,as.character(lasso_predict)) %>% data.frame()
+colnames(test_prediction_df_lasso) <- c("id","HTWins")
+
+write.csv(test_prediction_df_lasso,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-25_Lasso.csv') ### Scored .671 on Kaggle
+
+```
+
+
+############################## 12.8 CV Ridge - using select subset of data obtained from Lasso ##############################
+
+```{r}
+library(glmnet)
+#convert training data to matrix format
+x <- model.matrix(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl
++VT.pmxW
++HT.pmxW
++VT.OTA.blk
++HT.OTA.blk
++HT.S1.pts
++VT.S1.pts
++HT.S1.plmin
++VT.S1.plmin
++HT.S1.ast
++VT.S1.ast
+  ,Basketball_train)
+#convert class to numerical variable
+y <- ifelse(Basketball_train$HTWins=="Yes",1,0)
+
+#perform grid search to find optimal value of lambda
+#family= binomial => logistic regression, alpha=1 => lasso
+# check docs to explore other type.measure options
+cv.out <- cv.glmnet(x,y,alpha=0,family="binomial",type.measure = "mse")
+
+#plot result
+plot(cv.out)
+
+lambda_min <- cv.out$lambda.min
+#best value of lambda
+lambda_1se <- cv.out$lambda.1se
+#regression coefficients
+coef(cv.out,s=lambda_min)
+
+Basketball_test$HTWins <- sample(c(1,0),nrow(Basketball_test),replace = TRUE, prob = c(0.5,0.5))
+
+x_test <- model.matrix(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl
++VT.pmxW
++HT.pmxW
++VT.OTA.blk
++HT.OTA.blk
++HT.S1.pts
++VT.S1.pts
++HT.S1.plmin
++VT.S1.plmin
++HT.S1.ast
++VT.S1.ast
+  ,Basketball_train)
+
+lasso_prob <- predict(cv.out,newx = x_test,s=lambda_min,type="class")
+#translate probabilities to predictions
+lasso_predict <- ifelse(lasso_prob=="1","Yes","No")
+
+
+table(lasso_predict)
+
+mean(lasso_predict == Basketball_train$HTWins,na.rm=TRUE)
+
+test_prediction_df_lasso <- cbind(Basketball_test$id,as.character(lasso_predict)) %>% data.frame()
+colnames(test_prediction_df_lasso) <- c("id","HTWins")
+
+write.csv(test_prediction_df_lasso,'C:/Users/Nishanth Shetty/Desktop/Recovered Data/UCLA lecture materials for all subjects/Stats 101C/Kaggle/Submissions/Stats 101C_Nishanth Shetty_11-25_Lasso.csv') ### Scored .671 on Kaggle
+
+```
+
+## Showing that pts are rolling cumulative average
+```{r}
+
+Ajax_index <- which(Basketball_train$HT == "AJAX")
+plot(scale(Basketball_train$HT.TS.pts[Ajax_index]),col="red")
+
+```
+
+## Random Forest
+```{r}
+library(randomForest)
+
+set.seed(1)
+RF <- randomForest(factor(HTWins) ~ VT.TS.fg.percentage + HT.TS.fg.percentage
++VT.TS.tp.percentage
++HT.TS.tp.percentage
++VT.TS.pts
++HT.TS.pts
++VT.TS.pf
++HT.TS.pf
++VT.TS.ast
++HT.TS.ast
++VT.TS.dreb
++HT.TS.dreb
++VT.TS.fta
++HT.TS.fta
++VT.TS.stl
++HT.TS.stl
++VT.pmxW
++HT.pmxW
++VT.OTA.blk
++HT.OTA.blk
++HT.S1.pts
++VT.S1.pts
++HT.S1.plmin
++VT.S1.plmin
++HT.S1.ast
++VT.S1.ast
++HT.S2.plmin
++VT.S2.plmin
++HT
++VT
+  ,data= Basketball_train,mtry=3 ,ntree=100, importance = TRUE)
+varImpPlot(RF)
 
 ```
