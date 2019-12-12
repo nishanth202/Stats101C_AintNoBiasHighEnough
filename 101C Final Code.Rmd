@@ -1,0 +1,245 @@
+---
+title: "101C BBall model"
+author: "William Zhu"
+date: '2019-11-24'
+output: html_document
+---
+
+Loading data and required packages
+
+```{r setup, include=FALSE}
+train <- read.csv("~/dev/101C modelling/fall-2019-stats-101c/train.csv")
+test <- read.csv("~/dev/101C modelling/fall-2019-stats-101c/test.csv")
+
+library(ggplot2)
+library(dplyr)
+library(randomForest)
+library(class)
+library(glmnet)
+```
+
+
+Combining the test and training dataset and removing ID vectors as they don't provide statistical insights.
+
+```{r message=FALSE, warning=FALSE}
+test_labels = test$id
+test$HTWins <- NA
+
+all <- rbind(train, test)
+all$id <- NULL
+all$gameID <- NULL
+```
+
+Splitting Variables into groups.
+
+```{r}
+#HT and VT variables
+VT_vars = names(all[,grepl("VT", names(all))])
+HT_vars = names(all[,grepl("HT", names(all))])
+
+#HT and VT team variables
+VT_team_vars_TS = names(all[,grepl("VT.TS", names(all))])
+VT_team_vars_TA = names(all[,grepl("VT.TA", names(all))])
+VT_team_vars_OTS = names(all[,grepl("VT.OTS", names(all))])
+VT_team_vars_OTA = names(all[,grepl("VT.OTA", names(all))])
+
+HT_team_vars_TS = names(all[,grepl("HT.TS", names(all))])
+HT_team_vars_TA = names(all[,grepl("HT.TA", names(all))])
+HT_team_vars_OTS = names(all[,grepl("HT.OTS", names(all))])
+HT_team_vars_OTA = names(all[,grepl("HT.OTA", names(all))])
+
+#HT and VT player variables
+VT_team_vars_S1 = names(all[,grepl("VT.S1", names(all))])
+VT_team_vars_S2 = names(all[,grepl("VT.S2", names(all))])
+VT_team_vars_S3 = names(all[,grepl("VT.S3", names(all))])
+VT_team_vars_S4 = names(all[,grepl("VT.S4", names(all))])
+VT_team_vars_S5 = names(all[,grepl("VT.S5", names(all))])
+
+VT_team_vars_OS1 = names(all[,grepl("VT.OS1", names(all))])
+VT_team_vars_OS2 = names(all[,grepl("VT.OS2", names(all))])
+VT_team_vars_OS3 = names(all[,grepl("VT.OS3", names(all))])
+VT_team_vars_OS4 = names(all[,grepl("VT.OS4", names(all))])
+VT_team_vars_OS5 = names(all[,grepl("VT.OS5", names(all))])
+
+HT_team_vars_S1 = names(all[,grepl("HT.S1", names(all))])
+HT_team_vars_S2 = names(all[,grepl("HT.S2", names(all))])
+HT_team_vars_S3 = names(all[,grepl("HT.S3", names(all))])
+HT_team_vars_S4 = names(all[,grepl("HT.S4", names(all))])
+HT_team_vars_S5 = names(all[,grepl("HT.S5", names(all))])
+
+HT_team_vars_OS1 = names(all[,grepl("HT.OS1", names(all))])
+HT_team_vars_OS2 = names(all[,grepl("HT.OS2", names(all))])
+HT_team_vars_OS3 = names(all[,grepl("HT.OS3", names(all))])
+HT_team_vars_OS4 = names(all[,grepl("HT.OS4", names(all))])
+HT_team_vars_OS5 = names(all[,grepl("HT.OS5", names(all))])
+
+#PMX Variables
+VT_pmx = names(all[,grepl("VT.pmx", names(all))])
+
+HT_pmx = names(all[,grepl("HT.pmx", names(all))])
+```
+
+
+##Condensing the Data
+
+In this section I'll only be using the VT and HT variables under TS and TA.
+I wont be using OTS and OTA as each row already has VT.TS, HT.TS and VT.TA, HT.TA, so adding these two category of variable is in a sense reundant.
+
+I'll be considering TS variables as offensive stats and TA variables as defensive stats for both the visiting and offensive team.
+
+
+##Creating player variables
+
+I'm going to join:
+  - HT.S# player variables with VT.OS# player variables by plmin as a shared column
+  - VT.S# and HT.OS# by plmin
+
+```{r}
+
+VT.player1 = data.frame(all[,VT_team_vars_S1], all[,HT_team_vars_OS1[-1]])
+colnames(VT.player1) <- sub("HT.OS1.", "VT.S1.", colnames(VT.player1))
+
+VT.player2 = data.frame(all[,VT_team_vars_S2], all[,HT_team_vars_OS2[-1]])
+colnames(VT.player2) <- sub("HT.OS2.", "VT.S2.", colnames(VT.player2))
+
+VT.player3 = data.frame(all[,VT_team_vars_S3], all[,HT_team_vars_OS3[-1]])
+colnames(VT.player3) <- sub("HT.OS3.", "VT.S3.", colnames(VT.player3))
+
+VT.player4 = data.frame(all[,VT_team_vars_S4], all[,HT_team_vars_OS4[-1]])
+colnames(VT.player4) <- sub("HT.OS4.", "VT.S4.", colnames(VT.player4))
+
+VT.player5 = data.frame(all[,VT_team_vars_S5], all[,HT_team_vars_OS5[-1]])
+colnames(VT.player5) <- sub("HT.OS5.", "VT.S5.", colnames(VT.player5))
+
+HT.player1 = data.frame(all[,HT_team_vars_S1], all[,VT_team_vars_OS1[-1]])
+colnames(HT.player1) <- sub("VT.OS1.", "HT.S1.", colnames(HT.player1))
+
+HT.player2 = data.frame(all[,HT_team_vars_S2], all[,VT_team_vars_OS2[-1]])
+colnames(HT.player2) <- sub("VT.OS2.", "HT.S2.", colnames(HT.player2))
+
+HT.player3 = data.frame(all[,HT_team_vars_S3], all[,VT_team_vars_OS3[-1]])
+colnames(HT.player3) <- sub("VT.OS3.", "HT.S3.", colnames(HT.player3))
+
+HT.player4 = data.frame(all[,HT_team_vars_S4], all[,VT_team_vars_OS4[-1]])
+colnames(HT.player4) <- sub("VT.OS4.", "HT.S4.", colnames(HT.player4))
+
+HT.player5 = data.frame(all[,HT_team_vars_S5], all[,VT_team_vars_OS5[-1]])
+colnames(HT.player5) <- sub("VT.OS5.", "HT.S5.", colnames(HT.player5))
+```
+
+
+```{r}
+team.offense.df = data.frame(all[,HT_team_vars_TS[6:13]],
+                             all[,VT_team_vars_TS[6:13]])
+
+
+team.defense.df = data.frame(all[,HT_team_vars_TA[6:13]],
+                             all[,VT_team_vars_TA[6:13]])
+
+
+player.var = data.frame(VT.player1,
+                        VT.player2,
+                        VT.player3,
+                        VT.player4,
+                        VT.player5,
+                        HT.player1,
+                        HT.player2,
+                        HT.player3,
+                        HT.player4,
+                        HT.player5)
+
+other.var  = data.frame(all[,c('HTWins', 'VT', 'HT', 'VTleague', 'HTleague', 'VTcumRest', 'HTcumRest')])
+                     
+```
+
+DataFrame library
+
+```{r}
+#Full Condensed Dataframe
+full.df = data.frame(other.var,
+                     team.offense.df,
+                     team.defense.df,
+                     player.var
+                     )
+
+train.full.df = full.df[1:9520,]
+test.full.df = full.df[9521:11168,]
+```
+
+Variable Selection by Random Forest
+
+```{r fig1, fig.height = 5, fig.width = 5}
+knitr::opts_chunk$set(fig.width=5, fig.height=5) 
+
+set.seed(2019) 
+quick_RF.full <- randomForest(x=train.full.df[,-1], y=train.full.df$HTWins, ntree=1000, importance=TRUE)
+imp_RF.full <- importance(quick_RF.full)
+imp_DF.full <- data.frame(Variables = row.names(imp_RF.full), MSE = imp_RF.full[,1])
+imp_DF.full <- imp_DF.full[order(imp_DF.full$MSE, decreasing = TRUE),]
+
+ggplot(imp_DF.full[1:41,], aes(x=reorder(Variables, MSE), y=MSE, fill=MSE)) + geom_bar(stat = 'identity') + labs(x = 'Variables', y= '% increase MSE if variable is randomly permuted') + coord_flip() + theme(legend.position="none") + geom_hline(yintercept = 4, colour = "red") + ggtitle("Variable Importance by Random Forest")
+
+sel.var.full = imp_DF.full[imp_DF.full$MSE > 4, ]
+
+RF.full.train = train.full.df[,c(as.vector(sel.var.full$Variables))]
+RF.full.train = data.frame(RF.full.train, train.full.df$HTWins)
+
+RF.full.test = test.full.df[,c(as.vector(sel.var.full$Variables))]
+```
+
+##Lasso model
+
+```{r}
+x <- model.matrix(RF.full.train$train.full.df.HTWins ~ ., RF.full.train)
+y <- ifelse(RF.full.train$train.full.df.HTWins=="Yes",1,0)
+
+RF.full.test$HTWins <- sample(c("Yes", "No"),nrow(RF.full.test),replace = TRUE, prob = c(0.5,0.5))
+x_test <- model.matrix(HTWins ~. ,RF.full.test)
+```
+
+```{r}
+set.seed(1)
+cv.out_lasso <- cv.glmnet(x,y,alpha=1,family="binomial",type.measure = "mse")
+
+plot(cv.out_lasso, xlab = "Lambda for Lasso")
+
+lambda_min <- cv.out_lasso$lambda.min
+#best value of lambda
+lambda_1se <- cv.out_lasso$lambda.1se
+#regression coefficients
+coef(cv.out_lasso,s=lambda_min)
+
+lasso_prob <- predict(cv.out_lasso,newx = x_test,s=lambda_1se,type="response")
+#translate probabilities to predictions
+lasso_predict <- rep("No",nrow(RF.full.test))
+lasso_predict[lasso_prob>=.5] <- "Yes"
+table(lasso_predict)
+test_prediction_df_lasso <- data.frame(test_labels, lasso_predict)
+
+colnames(test_prediction_df_lasso) <- c("id","HTWins")
+```
+
+##Ridge Model
+
+```{r}
+set.seed(2)
+cv.out_ridge <- cv.glmnet(x,y,alpha=0,family="binomial",type.measure = "mse")
+
+plot(cv.out_ridge, xlab = "Lambda for Ridge")
+
+lambda_min <- cv.out_ridge$lambda.min
+#best value of lambda
+lambda_1se <- cv.out_ridge$lambda.1se
+#regression coefficients
+coef(cv.out_ridge,s=lambda_min)
+
+#predict class, type=”class”
+ridge_prob <- predict(cv.out_ridge,newx = x_test,s=lambda_1se,type="response")
+#translate probabilities to predictions
+ridge_predict <- rep("No",nrow(RF.full.test))
+ridge_predict[ridge_prob>=.5] <- "Yes"
+
+test_prediction_df_ridge <- data.frame(test_labels, ridge_predict)
+
+colnames(test_prediction_df_ridge) <- c("id","HTWins")
+```
